@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>日系生活帳本</title>
+
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="生活帳本">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2454/2454282.png">
+    <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/2454/2454282.png">
+    <meta name="theme-color" content="#F7F3F0">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body { 
+            font-family: 'Zen Maru Gothic', sans-serif; 
+            background-color: #F7F3F0; 
+            color: #6D5D4B; 
+            -webkit-tap-highlight-color: transparent;
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        * { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+        input, select { -webkit-user-select: text; user-select: text; }
+        
+        .soft-card { background: white; border-radius: 28px; box-shadow: 0 8px 24px rgba(109, 93, 75, 0.05); }
+        .tab-active { background: white; border-radius: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); color: #6D5D4B; }
+        .input-style { background: rgba(255,255,255,0.8); border: 1.5px solid #EAE2D6; border-radius: 15px; padding: 12px; width: 100%; margin-bottom: 12px; outline: none; font-size: 16px; }
+        .btn-main { background-color: #6D5D4B; color: #F7F3F0; border-radius: 15px; font-weight: 500; padding: 16px; width: 100%; transition: all 0.2s; box-shadow: 0 4px 12px rgba(109, 93, 75, 0.15); }
+        .btn-main:active { transform: scale(0.96); opacity: 0.9; }
+        .warning-text { color: #E89B9B; font-weight: 700; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        .category-tag { font-size: 10px; padding: 2px 8px; border-radius: 10px; background: #EEEAE6; margin-top: 4px; display: inline-block; }
+        .delete-btn { color: #E89B9B; cursor: pointer; padding: 5px; font-size: 1.2rem; }
+        ::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="max-w-md mx-auto min-h-screen pb-10">
+
+    <section class="p-6 pt-8">
+        <div class="soft-card p-6 text-center">
+            <h2 class="text-xs opacity-60 mb-2 font-medium"><span id="month-label"></span>月 日常支出預算</h2>
+            <div id="budget-alert" class="hidden mb-2 text-sm warning-text">⚠️ 本月日常消費已超支！</div>
+            <div class="text-4xl font-bold mb-4 text-[#5D5D5D]">¥ <span id="daily-spent-top">0</span></div>
+            <div class="flex justify-between text-sm border-t pt-4 border-dashed border-[#EAE2D6]">
+                <div>本月預算 <span class="font-medium">$18,000</span></div>
+                <div>剩餘 <span id="remain-amount" class="font-bold text-emerald-600">$18,000</span></div>
+            </div>
+        </div>
+    </section>
+
+    <nav class="mx-6 mb-6 flex bg-[#EAE2D6] p-1 rounded-[22px]">
+        <button onclick="switchTab('daily')" id="tab-daily" class="flex-1 py-2 text-sm font-medium tab-active">日常記帳</button>
+        <button onclick="switchTab('monthly')" id="tab-monthly" class="flex-1 py-2 text-sm font-medium text-gray-400">每月總結</button>
+    </nav>
+
+    <main id="page-daily" class="px-6">
+        <div class="soft-card p-5 mb-8">
+            <h3 class="text-[10px] font-bold mb-4 opacity-40 tracking-widest uppercase">New Expense / 新增支出</h3>
+            <input type="date" class="input-style" id="date-input">
+            <input type="text" class="input-style" placeholder="消費描述 (如：午餐、美甲)" id="desc-input">
+            <input type="number" class="input-style" placeholder="金額" id="amount-input" inputmode="decimal">
+            <div class="grid grid-cols-2 gap-3">
+                <select class="input-style" id="cat-input">
+                    <option>吃飯</option><option>電話費</option><option>交通</option>
+                    <option>美甲</option><option>娛樂</option><option>聚餐</option>
+                    <option>購物</option><option>其他</option>
+                </select>
+                <select class="input-style" id="pay-input">
+                    <option>現金</option><option>匯款</option>
+                    <option>信用卡_玉山</option><option>信用卡_星展</option><option>信用卡_永豐</option>
+                </select>
+            </div>
+            <button onclick="addRecord()" id="submit-btn" class="btn-main">記錄並同步雲端</button>
+        </div>
+
+        <h3 class="text-[10px] font-bold mb-3 px-2 opacity-40 tracking-widest uppercase">Records / 消費明細</h3>
+        <div class="space-y-3" id="history-list"></div>
+    </main>
+
+    <main id="page-monthly" class="px-6 hidden">
+        <div class="grid grid-cols-2 gap-4 mb-6">
+            <div class="soft-card p-4 text-center">
+                <div class="text-[10px] opacity-50 mb-1">本月日常累計</div>
+                <div class="text-xl font-bold text-gray-700">$<span id="monthly-daily-sum">0</span></div>
+            </div>
+            <div class="soft-card p-4 text-center">
+                <div class="text-[10px] opacity-50 mb-1">固定支出合計</div>
+                <div class="text-xl font-bold text-gray-700">$9,268</div>
+            </div>
+        </div>
+
+        <h3 class="text-[10px] font-bold mb-3 px-2 opacity-40 tracking-widest uppercase">Fixed Costs / 固定支出</h3>
+        <div class="soft-card overflow-hidden">
+            <table class="w-full text-sm">
+                <tbody class="divide-y divide-gray-50 text-gray-600">
+                    <tr><td class="p-4">流浪貓捐款 (永豐)</td><td class="p-4 text-right font-medium">$600</td></tr>
+                    <tr><td class="p-4">燒燙傷協會 (玉山)</td><td class="p-4 text-right font-medium">$1,000</td></tr>
+                    <tr><td class="p-4 text-[#D98B8B]">手機分期 (星展)<br><small class="opacity-60">至 2026/03 止</small></td><td class="p-4 text-right font-medium">$6,650</td></tr>
+                    <tr><td class="p-4 text-[#D98B8B]">美容儀 (星展)<br><small class="opacity-60">至 2026/10 止</small></td><td class="p-4 text-right font-medium">$708</td></tr>
+                    <tr><td class="p-4">APP訂閱費 (星展)</td><td class="p-4 text-right font-medium">$310</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <script>
+        // --- 核心設定 ---
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbygZKiaKlIU71REnQV1tNJ-OZt8I_cjF_0cL9Q6jswfhK3KWJR2qMMiPuEn8RA-Jue2gA/exec";
+        let records = JSON.parse(localStorage.getItem('my_expense_data')) || [];
+
+        // 初始化日期與月份顯示
+        const now = new Date();
+        const currentYearMonth = `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2, '0')}`;
+        document.getElementById('month-label').innerText = (now.getMonth() + 1);
+        document.getElementById('date-input').valueAsDate = now;
+
+        function switchTab(tab) {
+            const dPage = document.getElementById('page-daily'), mPage = document.getElementById('page-monthly');
+            const dBtn = document.getElementById('tab-daily'), mBtn = document.getElementById('tab-monthly');
+            if(tab === 'daily') {
+                dPage.classList.remove('hidden'); mPage.classList.add('hidden');
+                dBtn.classList.add('tab-active'); mBtn.classList.remove('tab-active');
+                mBtn.classList.add('text-gray-400');
+            } else {
+                mPage.classList.remove('hidden'); dPage.classList.add('hidden');
+                mBtn.classList.add('tab-active'); dBtn.classList.remove('tab-active');
+                dBtn.classList.add('text-gray-400');
+            }
+        }
+
+        async function addRecord() {
+            const submitBtn = document.getElementById('submit-btn');
+            const date = document.getElementById('date-input').value;
+            const desc = document.getElementById('desc-input').value;
+            const amount = parseFloat(document.getElementById('amount-input').value);
+            const cat = document.getElementById('cat-input').value;
+            const pay = document.getElementById('pay-input').value;
+
+            if (!desc || isNaN(amount)) { alert("請填入內容與正確金額"); return; }
+
+            // 1. 本地處理
+            const newRecord = { id: Date.now(), date, desc, amount, cat, pay };
+            records.unshift(newRecord);
+            localStorage.setItem('my_expense_data', JSON.stringify(records));
+            updateUI();
+            
+            // 2. 雲端同步
+            submitBtn.innerText = "☁️ 同步中...";
+            submitBtn.disabled = true;
+
+            try {
+                await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify(newRecord)
+                });
+                document.getElementById('desc-input').value = "";
+                document.getElementById('amount-input').value = "";
+                submitBtn.innerText = "記錄並同步雲端";
+                submitBtn.disabled = false;
+            } catch (error) {
+                console.error("同步失敗", error);
+                alert("雲端儲存異常，但資料已存於手機。");
+                submitBtn.innerText = "記錄並同步雲端";
+                submitBtn.disabled = false;
+            }
+        }
+
+        function deleteRecord(id) {
+            if(confirm("確定要刪除這筆紀錄嗎？")){
+                records = records.filter(r => r.id !== id);
+                localStorage.setItem('my_expense_data', JSON.stringify(records));
+                updateUI();
+            }
+        }
+
+        function updateUI() {
+            const list = document.getElementById('history-list');
+            list.innerHTML = "";
+            let monthlyTotal = 0;
+
+            records.forEach(r => {
+                // 計算僅限本月的日常開銷
+                if (r.date.startsWith(currentYearMonth)) {
+                    monthlyTotal += r.amount;
+                }
+
+                list.innerHTML += `
+                    <div class="soft-card p-4 flex justify-between items-center">
+                        <div>
+                            <div class="text-sm font-medium">${r.desc}</div>
+                            <div class="category-tag">${r.cat} · ${r.pay}</div>
+                        </div>
+                        <div class="flex items-center space-x-4 text-right">
+                            <div>
+                                <div class="font-bold">-$${r.amount.toLocaleString()}</div>
+                                <div class="text-[10px] opacity-30">${r.date}</div>
+                            </div>
+                            <div onclick="deleteRecord(${r.id})" class="delete-btn">🗑️</div>
+                        </div>
+                    </div>`;
+            });
+
+            // 預算狀態更新
+            const budget = 18000;
+            document.getElementById('daily-spent-top').innerText = monthlyTotal.toLocaleString();
+            document.getElementById('monthly-daily-sum').innerText = monthlyTotal.toLocaleString();
+            
+            const remainTag = document.getElementById('remain-amount');
+            const alertTag = document.getElementById('budget-alert');
+
+            if (monthlyTotal > budget) {
+                alertTag.classList.remove('hidden');
+                remainTag.innerText = "已超支";
+                remainTag.className = "font-bold text-red-400";
+            } else {
+                alertTag.classList.add('hidden');
+                remainTag.innerText = "$" + (budget - monthlyTotal).toLocaleString();
+                remainTag.className = "font-bold text-emerald-600";
+            }
+        }
+
+        // 啟動時讀取資料
+        updateUI();
+    </script>
+</body>
+</html>
